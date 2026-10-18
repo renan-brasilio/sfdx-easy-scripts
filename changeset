@@ -122,28 +122,39 @@ version="v1.1"
     # Gets the package name
     echo && read -p '- Changeset/Package Name: ' pkgName
 
+    # Validate package name to allow only safe characters (alphanumeric, underscore, hyphen, dot)
+    if [[ -z "$pkgName" || ! "$pkgName" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+        echo "Error: Invalid package name '$pkgName'. Use only alphanumeric characters, underscores, hyphens, and dots."
+        exit 1
+    fi
+
     # Save the current directory
     cwd=$(pwd)
 
-    # Go to the output directory
-    cd ~/SFDX/ChangeSets/$originOrg && echo && echo "- Checking if there's already a file with the same name..."
+    # Go to the output directory with verification and safety guard
+    targetDir="$HOME/SFDX/ChangeSets/$originOrg"
+    mkdir -p "$targetDir" || { echo "Error: Could not create output directory $targetDir"; exit 1; }
+    cd "$targetDir" || { echo "Error: Could not change directory to $targetDir"; exit 1; }
+    echo && echo "- Checking if there's already a file with the same name..."
 
     # Save the filename
-    fileName=~/SFDX/ChangeSets/$originOrg/$pkgName.zip
+    fileName="$targetDir/${pkgName}.zip"
 
-    # Check if there's already a file with the same name and remove it
-    if [ -f "$fileName" ] 
-    then
-        echo && echo "- Found a file with the same name, deleting..." && rm $pkgName.zip
+    # Check if there's already a file with the same name and remove it safely
+    if [ -f "$fileName" ]; then
+        echo && echo "- Found a file with the same name, deleting..." && rm -f -- "${pkgName}.zip"
     fi
 
     # Show the package and origin org selected before start
     echo && echo "- Retrieving Changeset/Package: $pkgName from $originOrg..." && echo
 
     # Retrieve the changeset/package, save it on ~/SFDX/ChangeSets/ and rename it
-    sfdx force:mdapi:retrieve -u $originOrg -p $pkgName -w 10 -r ~/SFDX/ChangeSets/$originOrg
+    sfdx force:mdapi:retrieve -u "$originOrg" -p "$pkgName" -w 10 -r "$targetDir"
     
-    # Rename the file
-    mv unpackaged.zip $pkgName.zip && cd ~/SFDX/$originOrg
-    echo && echo "- File moved and renamed to: ~/SFDX/ChangeSets/$originOrg/$pkgName.zip" && cd $cwd && echo && echo "$endingApp"
+    # Rename the file if retrieve succeeded
+    if [ -f "unpackaged.zip" ]; then
+        mv unpackaged.zip "${pkgName}.zip"
+        echo && echo "- File moved and renamed to: $targetDir/${pkgName}.zip"
+    fi
+    cd "$cwd" && echo && echo "$endingApp"
 ######## SCREEN - END ########
